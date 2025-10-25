@@ -1,10 +1,14 @@
-#修改CSV檔案格式使用
+# 修改CSV檔案格式使用
 
-import pandas as pd
 import os
 
+import pandas as pd
+
+
 def convert_to_book_level(old_csv_path, new_csv_path):
-    
+    """
+    transfer book data csv to book file names csv
+    """
     df = pd.read_csv(old_csv_path)
 
     books = {}

@@ -9,6 +9,7 @@ Date: 2025-10-19
 """
 import numpy as np
 
+
 # ==================================================
 # 📘 多圖融合（依部位權重）
 # ==================================================
@@ -20,7 +21,7 @@ def fuse_with_position_awareness(pred_dict):
     """
     relevance_matrix = {
         "front": {"corner": 1.0, "cover": 1.0, "dirty": 1.0, "damage": 1.0},
-        "back":  {"corner": 1.0, "cover": 1.0, "dirty": 1.0, "damage": 1.0},
+        "back": {"corner": 1.0, "cover": 1.0, "dirty": 1.0, "damage": 1.0},
         "spine": {"corner": 0.3, "cover": 1.0, "dirty": 1.0, "damage": 1.0}
     }
 
@@ -53,6 +54,7 @@ def fuse_with_position_awareness(pred_dict):
 
     return fused
 
+
 # ==================================================
 # 📊 一致性置信度
 # ==================================================
@@ -79,6 +81,7 @@ def calculate_confidence(pred_dict, book_id):
 
     avg_confidence = float(np.mean(list(confidences.values()))) if confidences else 0.0
     return avg_confidence, confidences
+
 
 # ==================================================
 # 🧾 改進版書況描述（單項分數門檻）

@@ -13,9 +13,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+
 @app.post("/checkBook")
 async def check_book():
     return get_predict_data()
+
 
 @app.post("/uploadImage")
 async def upload_image(image):

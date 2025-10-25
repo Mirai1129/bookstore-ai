@@ -1,5 +1,5 @@
-import torch
 from torch.utils.data import DataLoader
+
 from dataset import BookDataset
 
 train_ds = BookDataset("data/train_booklevel.csv", "data/images")

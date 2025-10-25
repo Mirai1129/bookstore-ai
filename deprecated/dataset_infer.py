@@ -1,20 +1,23 @@
+import os
+
+import pandas as pd
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from PIL import Image
-import pandas as pd
-import os
+
 
 class InferenceBookDataset(Dataset):
     def __init__(self, csv_file, img_dir, transform=None):
         self.df = pd.read_csv(csv_file)
         self.img_dir = img_dir
         self.transform = transform or transforms.Compose([
-            transforms.Resize((224,224)),
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
+    # torch Dataset has to implement __getitem__
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
         book_id = row["book_id"]
@@ -23,15 +26,17 @@ class InferenceBookDataset(Dataset):
 
         for view in ["front", "spine", "back"]:
             name = row.get(f"{view}_img", None)
+            # if dataframe has name -> pd.notna will return a bool to represent there is data in there
             if pd.notna(name):
                 path = os.path.join(self.img_dir, name)
                 img = Image.open(path).convert("RGB")
                 images[view] = self.transform(img)
                 img_names[view] = name
             else:
-                images[view] = torch.zeros(3,224,224)
+                images[view] = torch.zeros(3, 224, 224)
                 img_names[view] = None
 
+        # I have no idea why return img_names
         return images, book_id, img_names
 
     def __len__(self):
