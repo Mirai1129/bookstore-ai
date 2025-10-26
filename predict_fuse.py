@@ -6,202 +6,146 @@ from collections import defaultdict
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from torchvision import transforms
+from PIL import Image
 
 from training.dataset import BookDataset
 from training.model_multiview import MultiViewResNet
-from utils.utils import fuse_with_position_awareness, calculate_confidence, describe_condition
+from utils.utils import describe_condition
 
 CSV_PATH = "data/val_booklevel.csv"
-IMG_DIR = "data/raw"
+IMG_DIR = "data/images"
+MODEL_PATH = "multiview_book_model.pt"
+REPORT_PATH = "results/book_condition_report.json"
 
+TRANSFORM = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
-def predict(model, dataloader, device, num_classes=4):
-    """
-    改進版預測流程：
-    - 將模型的 softmax 機率轉為連續分數 (0~3)
-    - 保留 front/spine/back 三個視角的預測結果
-    """
+def predict_single_book(model, device,
+                        front_img: Image.Image | None = None,
+                        spine_img: Image.Image | None = None,
+                        back_img: Image.Image | None = None):
+    if not any([front_img, spine_img, back_img]):
+        return {"error": "請至少上傳一張圖片"}
+
+    files = {"front": front_img, "spine": spine_img, "back": back_img}
+    imgs_tensors = {}
+
+    for view, img in files.items():
+        if img:
+            imgs_tensors[view] = TRANSFORM(img).unsqueeze(0).to(device)
+        else:
+            imgs_tensors[view] = torch.zeros(1, 3, 224, 224).to(device)
+
+    model.eval()
+    with torch.no_grad():
+        outputs = model(imgs_tensors["front"], imgs_tensors["spine"], imgs_tensors["back"])
+
+    pred_scores = {}
+    weights = torch.arange(4, device=device, dtype=torch.float) # 假設 num_classes=4
+
+    for attr, logits in outputs.items():
+        probs = F.softmax(logits, dim=-1)
+        score = torch.sum(probs * weights, dim=-1).item()
+        pred_scores[attr] = float(score)
+
+    level, desc, score = describe_condition(pred_scores)
+
+    return {
+        "level": level,
+        "score": round(score, 2),
+        "desc": desc
+    }
+
+def _predict_batch(model, dataloader, device, num_classes=4):
     model.eval()
     book_preds = defaultdict(dict)
     weights = torch.arange(num_classes, device=device, dtype=torch.float)
 
     with torch.no_grad():
         for images_tuple, labels, book_ids in dataloader:
+            front_batch = images_tuple[0].to(device)
+            spine_batch = images_tuple[1].to(device)
+            back_batch = images_tuple[2].to(device)
 
-            view_tensors = {
-                "front": images_tuple[0].to(device),
-                "spine": images_tuple[1].to(device),
-                "back": images_tuple[2].to(device)
-            }
-            # 假設 images_tuple 的順序是固定的 (front, spine, back)
+            outputs = model(front_batch, spine_batch, back_batch)
 
-            for view_name, view_tensor in view_tensors.items():
-                outputs = model(view_tensor, view_tensor, view_tensor)
+            scores_by_attr = {}
+            for attr in ["corner", "cover", "dirty", "damage"]:
+                logits = outputs[attr]
+                probs = F.softmax(logits, dim=-1)
+                batch_scores = torch.sum(probs * weights, dim=-1)
+                scores_by_attr[attr] = batch_scores.cpu().tolist()
 
-                scores_by_attr = {}
-                for attr in ["corner", "cover", "dirty", "damage"]:
-                    logits = outputs[attr]
-                    probs = F.softmax(logits, dim=-1)
-                    batch_scores = torch.sum(probs * weights, dim=-1)
-                    scores_by_attr[attr] = batch_scores.cpu().tolist()
-
-                for i, book_id in enumerate(book_ids):
-                    book_id = str(book_id)
-                    preds = {}
-                    for attr in scores_by_attr:
-                        preds[attr] = scores_by_attr[attr][i]
-
-                    book_preds[book_id][view_name] = preds
+            for i, book_id in enumerate(book_ids):
+                book_id = str(book_id)
+                final_preds = {}
+                for attr in scores_by_attr:
+                    final_preds[attr] = scores_by_attr[attr][i]
+                book_preds[book_id] = final_preds
 
     return book_preds
 
+def _load_model_for_batch(device):
+    """輔助函式：載入模型"""
+    model = MultiViewResNet().to(device)
+    if os.path.exists(MODEL_PATH):
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+        print(f"✅ 已載入模型權重 {MODEL_PATH}")
+    else:
+        print(f"⚠️ 未找到 {MODEL_PATH}，使用隨機初始化模型")
+    return model
 
-def _predict_data():
+def run_batch_prediction():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"使用設備: {device}")
 
-    if not os.path.exists(CSV_PATH):
-        raise FileNotFoundError(f"📂 CSV 檔案不存在：{CSV_PATH}")
-    if not os.path.exists(IMG_DIR):
-        raise FileNotFoundError(f"📂 圖片資料夾不存在：{IMG_DIR}")
+    if not os.path.exists(CSV_PATH) or not os.path.exists(IMG_DIR):
+        raise FileNotFoundError("📂 CSV 或 圖片資料夾不存在")
 
-    # TODO: change loading data method, we shouldn't read photo path from csv file, it should be directory.
-    dataset = BookDataset(CSV_PATH, IMG_DIR)
+    # 確保 BookDataset 在內部使用與 API 相同的 TRANSFORM
+    dataset = BookDataset(CSV_PATH, IMG_DIR, transform=TRANSFORM)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=False)
 
-    # === 載入模型 ===
-    model = MultiViewResNet().to(device)
-    if os.path.exists("multiview_book_model.pt"):
-        model.load_state_dict(torch.load("multiview_book_model.pt", map_location=device))
-        print("✅ 已載入模型權重 multiview_book_model.pt")
-    else:
-        print("⚠️ 未找到 multiview_book_model.pt，使用隨機初始化模型（示範）")
+    model = _load_model_for_batch(device)
 
-    # === 預測 ===
     print("\n開始預測...\n")
-    preds = predict(model, dataloader, device)
+    preds = _predict_batch(model, dataloader, device) # 呼叫 Batch 函式
     print(f"\n✅ 預測完成，共 {len(preds)} 本書\n")
-
-    # === 融合與報告 ===
-    fused = fuse_with_position_awareness(preds)
 
     print("=" * 70)
     print("📚 二手書書況分析報告".center(70))
     print("=" * 70)
 
     reports = {}
-
-    for book_id, attrs in sorted(fused.items(), key=lambda x: str(x[0])):
-        # 改進後的 describe_condition
+    for book_id, attrs in sorted(preds.items(), key=lambda x: str(x[0])):
         level, desc, score = describe_condition(attrs)
-
-        # 置信度計算
-        avg_confidence, attr_confidences = calculate_confidence(preds, book_id)
-
         reports[book_id] = {
             "level": level,
             "score": round(float(score), 2),
-            "confidence": round(float(avg_confidence), 4),
             "desc": desc,
-            "attr_confidences": {k: round(v, 4) for k, v in attr_confidences.items()}
         }
 
-        print(f"\n📖 Book ID: {book_id}")
-        print(f"   整體評級：{level}")
-        print(f"   綜合分數：{score:.2f}/3.0")
-        print(f"   預測置信度：{avg_confidence:.1%}")
-        print(f"   詳細狀況：{desc}")
-        print("-" * 70)
-
-    # === 儲存結果 ===
     os.makedirs("results", exist_ok=True)
-    out_path = "results/book_condition_report.json"
-    with open(out_path, "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(reports, f, ensure_ascii=False, indent=2)
 
-    print(f"\n📄 已將融合結果輸出至 {out_path}")
+    print(f"\n📄 已將融合結果輸出至 {REPORT_PATH}")
     print("\n分析完成！")
-    return out_path
+    return REPORT_PATH
 
+def read_latest_report():
+    if not os.path.exists(REPORT_PATH):
+        raise FileNotFoundError(f"報告檔案 {REPORT_PATH} 不存在。請先執行 run_batch_prediction()。")
 
-def get_predict_data():
-    _predict_data()
-    with open('results/book_condition_report.json', 'r', encoding='utf-8') as f:
+    with open(REPORT_PATH, 'r', encoding='utf-8') as f:
         data = json.load(f)
-
     return data
 
-
-# ==================================================
-# 📖 主程式
-# ==================================================
 if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"使用設備: {device}")
     start_time = datetime.datetime.now()
-
-    # === 載入資料 ===
-    csv_path = "data/val_booklevel.csv"
-    img_dir = "data/images"
-
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"📂 CSV 檔案不存在：{csv_path}")
-    if not os.path.exists(img_dir):
-        raise FileNotFoundError(f"📂 圖片資料夾不存在：{img_dir}")
-
-    dataset = BookDataset(csv_path, img_dir)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=False)
-
-    # === 載入模型 ===
-    model = MultiViewResNet().to(device)
-    if os.path.exists("multiview_book_model.pt"):
-        model.load_state_dict(torch.load("multiview_book_model.pt", map_location=device))
-        print("✅ 已載入模型權重 multiview_book_model.pt")
-    else:
-        print("⚠️ 未找到 multiview_book_model.pt，使用隨機初始化模型（示範）")
-
-    # === 預測 ===
-    print("\n開始預測...\n")
-    preds = predict(model, dataloader, device)
-    print(f"\n✅ 預測完成，共 {len(preds)} 本書\n")
-
-    # === 融合與報告 ===
-    fused = fuse_with_position_awareness(preds)
-
-    print("=" * 70)
-    print("📚 二手書書況分析報告".center(70))
-    print("=" * 70)
-
-    reports = {}
-
-    for book_id, attrs in sorted(fused.items(), key=lambda x: str(x[0])):
-        # 改進後的 describe_condition
-        level, desc, score = describe_condition(attrs)
-
-        # 置信度計算
-        avg_confidence, attr_confidences = calculate_confidence(preds, book_id)
-
-        reports[book_id] = {
-            "level": level,
-            "score": round(float(score), 2),
-            "confidence": round(float(avg_confidence), 4),
-            "desc": desc,
-            "attr_confidences": {k: round(v, 4) for k, v in attr_confidences.items()}
-        }
-
-        print(f"\n📖 Book ID: {book_id}")
-        print(f"   整體評級：{level}")
-        print(f"   綜合分數：{score:.2f}/3.0")
-        print(f"   預測置信度：{avg_confidence:.1%}")
-        print(f"   詳細狀況：{desc}")
-        print("-" * 70)
-
-    # === 儲存結果 ===
-    os.makedirs("results", exist_ok=True)
-    out_path = "results/book_condition_report.json"
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(reports, f, ensure_ascii=False, indent=2)
-
-    print(f"\n📄 已將融合結果輸出至 {out_path}")
-    print("\n分析完成！")
-    print(datetime.datetime.now() - start_time)
+    run_batch_prediction()
+    print(f"\nTotal execution time: {datetime.datetime.now() - start_time}")
