@@ -1,6 +1,7 @@
 import torch
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from training.model_multiview import MultiViewResNet
@@ -21,6 +22,10 @@ model = MultiViewResNet().to(device)
 model.load_state_dict(torch.load("multiview_book_model.pt", map_location=device))
 model.eval()
 
+
+@app.get("/")
+async def index():
+    return FileResponse("index.html", media_type="text/html")
 
 @app.post("/predict")
 async def predict(
