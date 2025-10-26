@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 from collections import defaultdict
@@ -22,6 +23,7 @@ def predict(model, dataloader, device, num_classes=4):
     """
     model.eval()
     book_preds = defaultdict(dict)
+    weights = torch.arange(num_classes, device=device, dtype=torch.float)
 
     with torch.no_grad():
         for images_tuple, labels, book_ids in dataloader:
@@ -32,9 +34,6 @@ def predict(model, dataloader, device, num_classes=4):
                 "back": images_tuple[2].to(device)
             }
             # 假設 images_tuple 的順序是固定的 (front, spine, back)
-
-
-            weights = torch.arange(num_classes, device=device, dtype=torch.float)
 
             for view_name, view_tensor in view_tensors.items():
                 outputs = model(view_tensor, view_tensor, view_tensor)
@@ -139,6 +138,7 @@ def get_predict_data():
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"使用設備: {device}")
+    start_time = datetime.datetime.now()
 
     # === 載入資料 ===
     csv_path = "data/val_booklevel.csv"
@@ -204,3 +204,4 @@ if __name__ == "__main__":
 
     print(f"\n📄 已將融合結果輸出至 {out_path}")
     print("\n分析完成！")
+    print(datetime.datetime.now() - start_time)

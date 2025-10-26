@@ -52,7 +52,8 @@ class BookDataset(Dataset):
         #             images[view] = torch.zeros(3, 224, 224)
 
         # TODO: 先看資料怎麼來的，csv 的 corner 這種欄位怎麼來的，如果沒有圖片要怎麼處理
-        for view in ['front', 'spine', 'back']:
+        # TODO: 現在知道資料是從 label studio 出來的，意味著圖片目前需要先標記
+        for view in book_views:
             img_name = row[f"{view}_img"]
 
             # if dataframe has name -> pd.notna will return a bool to represent there is data in there

@@ -37,7 +37,7 @@ def convert_to_book_level(old_csv_path, new_csv_path):
         elif "back" in name:
             books[book_id]["back_img"] = img_name
 
-        # 標籤取三張圖中最嚴重的那個（max）
+        # 取三張圖片這四個地方最嚴重的存起來，圖一 1，圖二 2，所以就拿 2
         for attr in ["corner", "cover", "dirty", "damage"]:
             books[book_id][attr] = max(books[book_id][attr], row[attr])
 
