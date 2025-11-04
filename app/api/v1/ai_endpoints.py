@@ -1,33 +1,20 @@
 import torch
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, File, UploadFile
 
+from app import MODEL_PATH
 from training.model_multiview import MultiViewResNet
-from predict_fuse import predict_single_book
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=["*"],
-    allow_methods=["POST"],
-    allow_headers=["*"]
-)
+from training.predict_fuse import predict_single_book
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = MultiViewResNet().to(device)
-model.load_state_dict(torch.load("multiview_book_model.pt", map_location=device))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.eval()
 
+router = APIRouter()
 
-@app.get("/")
-async def index():
-    return FileResponse("index.html", media_type="text/html")
 
-@app.post("/predict")
+@router.post("/predict")
 async def predict(
         front: UploadFile | None = File(None),
         spine: UploadFile | None = File(None),

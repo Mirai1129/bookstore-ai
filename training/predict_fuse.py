@@ -13,10 +13,10 @@ from training.dataset import BookDataset
 from training.model_multiview import MultiViewResNet
 from utils.utils import describe_condition
 
-CSV_PATH = "data/val_booklevel.csv"
-IMG_DIR = "data/images"
+CSV_PATH = "../data/val_booklevel.csv"
+IMG_DIR = "../data/images"
 MODEL_PATH = "multiview_book_model.pt"
-REPORT_PATH = "results/book_condition_report.json"
+REPORT_PATH = "../results/book_condition_report.json"
 
 TRANSFORM = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -129,7 +129,7 @@ def run_batch_prediction():
             "desc": desc,
         }
 
-    os.makedirs("results", exist_ok=True)
+    os.makedirs("../results", exist_ok=True)
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(reports, f, ensure_ascii=False, indent=2)
 
