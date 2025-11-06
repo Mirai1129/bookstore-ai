@@ -13,7 +13,7 @@ def create_new_user(user: UserCreate, db: Database = Depends(get_db)):
     existing_user = crud.get_user_by_line_id(db, line_id=user.line_id)
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_202_ACCEPTED,
             detail="User with this LINE ID already exists."
         )
 

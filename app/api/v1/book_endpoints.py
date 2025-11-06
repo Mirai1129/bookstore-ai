@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pymongo.database import Database
 
 from app.db import crud_book as crud
@@ -10,14 +10,8 @@ from app.schemas.book import Book, BookCreate, BookUpdate
 router = APIRouter(prefix="/books")
 
 
-# TODO: 這是一個「暫時的模擬函數」，你未來必須用你真正的「認證系統」取代它
+# TODO: Have to be authorized
 def get_current_user_id() -> str:
-    """
-    (暫時) 模擬從 JWT token 或 session 中取得當前登入的 user ID。
-    你必須用你真實的 `Depends(get_current_user)` 依賴來替換它。
-    """
-    # 在真實的 APP 中，你會在這裡解碼 Token
-    # 為了測試，我們先寫死一個賣家 ID
     return "temp_seller_id_from_token"
 
 
@@ -29,6 +23,15 @@ def create_new_book(
 ):
     return crud.create_book(db=db, book=book, seller_id=seller_id)
 
+
+@router.get("/", response_model=List[Book])
+def read_books(
+        skip: int = Query(0, ge=0, description="Skip N items"),
+        limit: int = Query(20, ge=1, le=100, description="Limit N items"),
+        db: Database = Depends(get_db)
+):
+    books = crud.get_all_books(db=db, skip=skip, limit=limit)
+    return books
 
 @router.get("/{book_id}", response_model=Book)
 def get_book_by_id(book_id: str, db: Database = Depends(get_db)):

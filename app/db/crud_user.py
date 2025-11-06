@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -14,7 +14,7 @@ def _is_object_id_valid(object_id: str) -> bool:
 
 def create_user(db: Database, user: UserCreate) -> User:
     user_data = user.model_dump()
-    user_data["created_at"] = datetime.now()
+    user_data["created_at"] = datetime.now(timezone.utc)
 
     collection = db[settings.COLLECTION_NAME_USERS]
 
