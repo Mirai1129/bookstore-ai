@@ -8,6 +8,10 @@ from app.core.config import settings
 from app.schemas.user import User, UserCreate, UserUpdate
 
 
+def _is_object_id_valid(object_id: str) -> bool:
+    return ObjectId.is_valid(object_id)
+
+
 def create_user(db: Database, user: UserCreate) -> User:
     user_data = user.model_dump()
     user_data["created_at"] = datetime.now()
@@ -62,7 +66,3 @@ def update_user(db: Database, user_id: str, user_update: UserUpdate) -> User | N
         return None
 
     return User(**updated_user)
-
-
-def _is_object_id_valid(object_id: str) -> bool:
-    return ObjectId.is_valid(object_id)
