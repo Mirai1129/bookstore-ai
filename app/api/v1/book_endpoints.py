@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from pymongo.database import Database
 
 from app.db import crud_book as crud
@@ -10,9 +10,8 @@ from app.schemas.book import Book, BookCreate, BookUpdate
 router = APIRouter(prefix="/books")
 
 
-# TODO: Have to be authorized
-def get_current_user_id() -> str:
-    return "temp_seller_id_from_token"
+def get_current_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> str:
+    return x_user_id
 
 
 @router.post("/", response_model=Book, status_code=status.HTTP_201_CREATED)
@@ -32,6 +31,7 @@ def read_books(
 ):
     books = crud.get_all_books(db=db, skip=skip, limit=limit)
     return books
+
 
 @router.get("/{book_id}", response_model=Book)
 def get_book_by_id(book_id: str, db: Database = Depends(get_db)):
