@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.ai_endpoints import router as ai_endpoints_router
 from app.api.v1.book_endpoints import router as book_endpoints_router
+from app.api.v1.cart_endpoints import router as cart_endpoints_router
 from app.api.v1.order_endpoints import router as order_endpoints_router
 from app.api.v1.user_endpoints import router as user_endpoints_router
 from app.core.config import settings
@@ -12,16 +13,14 @@ app = FastAPI()
 # TODO fix CORS
 
 origins = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8000",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -48,6 +47,12 @@ app.include_router(
     router=order_endpoints_router,
     prefix=settings.API_V1_PREFIX,
     tags=["Database - Order"]
+)
+
+app.include_router(
+    router=cart_endpoints_router,
+    prefix="/api/v1/carts",
+    tags=["Carts"]
 )
 
 
