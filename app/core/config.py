@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     API_SERVER_PORT: int = Field(default=8080)
     MONGODB_CONNECTION_STRING: str = Field(validation_alias='MONGODB_CONNECTION_URL')
 
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str = Field(..., validation_alias='CLOUDINARY_CLOUD_NAME')
+    CLOUDINARY_API_KEY: str = Field(..., validation_alias='CLOUDINARY_API_KEY')
+    CLOUDINARY_API_SECRET: str = Field(..., validation_alias='CLOUDINARY_API_SECRET')
+
     # Database
     DATABASE_NAME: str = Field(validation_alias='DATABASE_NAME')
     COLLECTION_NAME_BOOKS: str = "books"
