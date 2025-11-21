@@ -55,7 +55,7 @@ app.include_router(
 
 app.include_router(
     router=order_endpoints_router,
-    prefix=settings.API_V1_PREFIX,
+    prefix=settings.API_V1_PREFIX + "/orders",
     tags=["Database - Order"]
 )
 

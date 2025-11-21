@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -49,7 +49,9 @@ def get_book_by_seller_id(db: Database, seller_id: str) -> List[Book]:
 
 def get_all_books(db: Database, skip: int = 0, limit: int = 100) -> List[Book]:
     collection = db[settings.COLLECTION_NAME_BOOKS]
-    cursor = collection.find().skip(skip).limit(limit)
+
+    cursor = collection.find({"is_sold": {"$ne": True}}).skip(skip).limit(limit)
+
     return [Book(**doc) for doc in cursor]
 
 
@@ -57,12 +59,20 @@ def update_book(db: Database, book_id: str, book_update: BookUpdate) -> Book | N
     if not _is_object_id_valid(book_id):
         return None
 
+    collection = db[settings.COLLECTION_NAME_BOOKS]
+
+    existing_book = collection.find_one({"_id": ObjectId(book_id)})
+
+    if not existing_book:
+        return None
+
+    if existing_book.get("is_sold") is True:
+        return None
+
     update_data = book_update.model_dump(exclude_unset=True)
 
     if not update_data:
-        return get_book_by_id(db, book_id)
-
-    collection = db[settings.COLLECTION_NAME_BOOKS]
+        return Book(**existing_book)
 
     updated_book = collection.find_one_and_update(
         {"_id": ObjectId(book_id)},

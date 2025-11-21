@@ -29,6 +29,22 @@ def add_item_to_cart(
     return updated_cart
 
 
+@router.delete("/items/{book_id}", response_model=Cart)
+def remove_item_from_cart(
+        book_id: str,
+        user_id: str = Depends(get_current_user_id),
+        db: Database = Depends(get_db)
+):
+    cart = crud.remove_item_from_cart(db, user_id, book_id)
+
+    if not cart:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cart not found or item not in cart"
+        )
+    return cart
+
+
 @router.get("/", response_model=Cart)
 def get_my_cart(
         user_id: str = Depends(get_current_user_id),

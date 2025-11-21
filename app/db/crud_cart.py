@@ -51,3 +51,35 @@ def add_item_to_cart(db: Database, user_id: str, item: CartItemAdd):
 def get_cart_by_user_id(db: Database, user_id: str):
     collection = db[settings.COLLECTION_NAME_CARTS]
     return collection.find_one({"user_id": user_id})
+
+
+def remove_item_from_cart(db: Database, user_id: str, book_id: str):
+    collection = db[settings.COLLECTION_NAME_CARTS]
+    now = datetime.now()
+
+    result = collection.find_one_and_update(
+        {"user_id": user_id},
+        {
+            "$pull": {"items": {"book_id": book_id}},
+            "$set": {"updated_at": now}
+        },
+        return_document=ReturnDocument.AFTER
+    )
+    return result
+
+
+def clear_cart(db: Database, user_id: str):
+    collection = db[settings.COLLECTION_NAME_CARTS]
+    now = datetime.now()
+
+    result = collection.find_one_and_update(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "items": [],
+                "updated_at": now
+            }
+        },
+        return_document=ReturnDocument.AFTER
+    )
+    return result

@@ -13,6 +13,10 @@ class BookBase(BaseModel):
     condition: str = Field(..., description="Book condition")
     description: Optional[str] = Field(None, description="Book description")
     image_url: str = Field(..., description="Book image url")
+    image_front_url: Optional[str] = Field(None, description="Front cover image")
+    image_spine_url: Optional[str] = Field(None, description="Spine image")
+    image_back_url: Optional[str] = Field(None, description="Back cover image")
+    is_sold: bool = Field(default=False, description="Is sold out")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -31,6 +35,9 @@ class BookUpdate(BaseModel):
     condition: Optional[str] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
+    image_front_url: Optional[str] = None
+    image_spine_url: Optional[str] = None
+    image_back_url: Optional[str] = None
     is_sold: Optional[bool] = None
 
 
